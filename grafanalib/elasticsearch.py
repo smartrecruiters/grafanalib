@@ -343,7 +343,7 @@ class TermsGroupBy(object):
                 'min_doc_count': self.minDocCount,
                 'order': self.order,
                 'orderBy': self.orderBy,
-                'size': self.size,
+                'size': str(self.size),
             },
         }
 
