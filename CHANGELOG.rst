@@ -2,6 +2,19 @@
 Changelog
 =========
 
+
+0.7.0.post2 (2023-10-31)
+==================
+
+* Fix TermsGroupBy for ElastickSearch source (size should be str instead int)
+
+0.7.0.post1 (2023-06-26)
+==================
+
+* Adjust Grafana 9.xAlert Rules data model
+
+
+
 0.x.x (?)
 ==================
 
