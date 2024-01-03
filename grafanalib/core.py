@@ -5,13 +5,14 @@ The functions in this module don't enforce Weaveworks policy, and only mildly
 encourage it by way of some defaults. Rather, they are ways of building
 arbitrary Grafana JSON.
 """
-
+from __future__ import annotations
 import itertools
 import math
 
 import string
 import warnings
 from numbers import Number
+from typing import Literal
 
 import attr
 from attr.validators import in_, instance_of
@@ -74,7 +75,7 @@ NULL_AS_NULL = 'null'
 FLOT = 'flot'
 
 ABSOLUTE_TYPE = 'absolute'
-DASHBOARD_TYPE = 'dashboard'
+DASHBOARD_TYPE = Literal['dashboards', 'link']
 ROW_TYPE = 'row'
 GRAPH_TYPE = 'graph'
 DISCRETE_TYPE = 'natel-discrete-panel'
@@ -276,7 +277,7 @@ GAUGE_CALC_FIRST = 'first'
 GAUGE_CALC_MIN = 'min'
 GAUGE_CALC_MAX = 'max'
 GAUGE_CALC_MEAN = 'mean'
-GAUGE_CALC_TOTAL = 'total'
+GAUGE_CALC_TOTAL = 'sum'
 GAUGE_CALC_COUNT = 'count'
 GAUGE_CALC_RANGE = 'range'
 GAUGE_CALC_DELTA = 'delta'
@@ -299,6 +300,9 @@ GRAPH_TOOLTIP_MODE_SHARED_TOOLTIP = 2  # Shared crosshair AND tooltip
 
 DEFAULT_AUTO_COUNT = 30
 DEFAULT_MIN_AUTO_INTERVAL = '10s'
+
+DASHBOARD_LINK_ICON = Literal['bolt', 'cloud', 'dashboard', 'doc',
+                              'external link', 'info', 'question']
 
 
 @attr.s
@@ -887,24 +891,65 @@ class ConstantInput(object):
 
 @attr.s
 class DashboardLink(object):
-    dashboard = attr.ib()
-    uri = attr.ib()
-    keepTime = attr.ib(
+    """Create a link to other dashboards, or external resources.
+
+    Dashboard Links come in two flavours; a list of dashboards, or a direct
+    link to an arbitrary URL. These are controlled by the ``type`` parameter.
+    A dashboard list targets a given set of tags, whereas for a link you must
+    also provide the URL.
+
+    See `the documentation <https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/manage-dashboard-links/#dashboard-links>`
+    for more information.
+
+    :param asDropdown: Controls if the list appears in a dropdown rather than
+        tiling across the dashboard. Affects 'dashboards' type only. Defaults
+        to False
+    :param icon: Set the icon, from a predefined list. See
+        ``grafanalib.core.DASHBOARD_LINK_ICON`` for allowed values. Affects
+        the 'link' type only. Defaults to 'external link'
+    :param includeVars: Controls if data variables from the current dashboard
+        are passed as query parameters to the linked target. Defaults to False
+    :param keepTime: Controls if the current time range is passed as query
+        parameters to the linked target. Defaults to False
+    :param tags: A list of tags used to select dashboards for the link.
+        Affects the 'dashboards' type only. Defaults to an empty list
+    :param targetBlank: Controls if the link opens in a new tab. Defaults
+        to False
+    :param tooltip: Tooltip text that appears when hovering over the link.
+        Affects the 'link' type only. Defaults to an empty string
+    :param type: Controls the type of DashboardLink generated. Must be
+        one of 'dashboards' or 'link'.
+    :param uri: The url target of the external link. Affects the 'link'
+        type only.
+    """
+    asDropdown: bool = attr.ib(default=False, validator=instance_of(bool))
+    icon: DASHBOARD_LINK_ICON = attr.ib(default='external link',
+                                        validator=in_(DASHBOARD_LINK_ICON.__args__))
+    includeVars: bool = attr.ib(default=False, validator=instance_of(bool))
+    keepTime: bool = attr.ib(
         default=True,
         validator=instance_of(bool),
     )
-    title = attr.ib(default=None)
-    type = attr.ib(default=DASHBOARD_TYPE)
+    tags: list[str] = attr.ib(factory=list, validator=instance_of(list))
+    targetBlank: bool = attr.ib(default=False, validator=instance_of(bool))
+    title: str = attr.ib(default="")
+    tooltip: str = attr.ib(default="", validator=instance_of(str))
+    type: DASHBOARD_TYPE = attr.ib(default='dashboards',
+                                   validator=in_(DASHBOARD_TYPE.__args__))
+    uri: str = attr.ib(default="", validator=instance_of(str))
 
     def to_json_data(self):
-        title = self.dashboard if self.title is None else self.title
         return {
-            'dashUri': self.uri,
-            'dashboard': self.dashboard,
+            'asDropdown': self.asDropdown,
+            'icon': self.icon,
+            'includeVars': self.includeVars,
             'keepTime': self.keepTime,
-            'title': title,
+            'tags': self.tags,
+            'targetBlank': self.targetBlank,
+            'title': self.title,
+            'tooltip': self.tooltip,
             'type': self.type,
-            'url': self.uri,
+            'url': self.uri
         }
 
 
@@ -2084,7 +2129,7 @@ class Graph(Panel):
     :param stack: Each series is stacked on top of another
     :param percentage: Available when Stack is selected. Each series is drawn as a percentage of the total of all series
     :param thresholds: List of GraphThresholds - Only valid when alert not defined
-
+    :param unit: Set Y Axis Unit
     """
 
     alert = attr.ib(default=None)
@@ -2118,6 +2163,7 @@ class Graph(Panel):
         validator=instance_of(Tooltip),
     )
     thresholds = attr.ib(default=attr.Factory(list))
+    unit = attr.ib(default='', validator=instance_of(str))
     xAxis = attr.ib(default=attr.Factory(XAxis), validator=instance_of(XAxis))
     try:
         yAxes = attr.ib(
@@ -2137,6 +2183,11 @@ class Graph(Panel):
             'aliasColors': self.aliasColors,
             'bars': self.bars,
             'error': self.error,
+            'fieldConfig': {
+                'defaults': {
+                    'unit': self.unit
+                },
+            },
             'fill': self.fill,
             'grid': self.grid,
             'isNew': self.isNew,
@@ -2242,11 +2293,15 @@ class TimeSeries(Panel):
     :param thresholds: single stat thresholds
     :param tooltipMode: When you hover your cursor over the visualization, Grafana can display tooltips
         single (Default), multi, none
+    :param tooltipSort: To sort the tooltips
+        none (Default), asc, desc
     :param unit: units
     :param thresholdsStyleMode: thresholds style mode off (Default), area, line, line+area
     :param valueMin: Minimum value for Panel
     :param valueMax: Maximum value for Panel
     :param valueDecimals: Number of display decimals
+    :param axisSoftMin: soft minimum Y axis value
+    :param axisSoftMax: soft maximum Y axis value
     """
 
     axisPlacement = attr.ib(default='auto', validator=instance_of(str))
@@ -2297,12 +2352,15 @@ class TimeSeries(Panel):
     showPoints = attr.ib(default='auto', validator=instance_of(str))
     stacking = attr.ib(factory=dict, validator=instance_of(dict))
     tooltipMode = attr.ib(default='single', validator=instance_of(str))
+    tooltipSort = attr.ib(default='none', validator=instance_of(str))
     unit = attr.ib(default='', validator=instance_of(str))
     thresholdsStyleMode = attr.ib(default='off', validator=instance_of(str))
 
     valueMin = attr.ib(default=None, validator=attr.validators.optional(instance_of(int)))
     valueMax = attr.ib(default=None, validator=attr.validators.optional(instance_of(int)))
     valueDecimals = attr.ib(default=None, validator=attr.validators.optional(instance_of(int)))
+    axisSoftMin = attr.ib(default=None, validator=attr.validators.optional(instance_of(int)))
+    axisSoftMax = attr.ib(default=None, validator=attr.validators.optional(instance_of(int)))
 
     def to_json_data(self):
         return self.panel_json(
@@ -2337,6 +2395,8 @@ class TimeSeries(Panel):
                             'thresholdsStyle': {
                                 'mode': self.thresholdsStyleMode
                             },
+                            'axisSoftMin': self.axisSoftMin,
+                            'axisSoftMax': self.axisSoftMax
                         },
                         'mappings': self.mappings,
                         "min": self.valueMin,
@@ -2353,7 +2413,8 @@ class TimeSeries(Panel):
                         'calcs': self.legendCalcs
                     },
                     'tooltip': {
-                        'mode': self.tooltipMode
+                        'mode': self.tooltipMode,
+                        'sort': self.tooltipSort
                     }
                 },
                 'type': TIMESERIES_TYPE,
@@ -2736,6 +2797,7 @@ class Stat(Panel):
     """
 
     alignment = attr.ib(default='auto')
+    color = attr.ib(default=None)
     colorMode = attr.ib(default='value')
     decimals = attr.ib(default=None)
     format = attr.ib(default='none')
@@ -2754,6 +2816,7 @@ class Stat(Panel):
             {
                 'fieldConfig': {
                     'defaults': {
+                        'color': self.color,
                         'custom': {},
                         'decimals': self.decimals,
                         'mappings': self.mappings,
@@ -3203,6 +3266,18 @@ class Column(object):
 
 
 @attr.s
+class TableSortByField(object):
+    displayName = attr.ib(default="")
+    desc = attr.ib(default=False)
+
+    def to_json_data(self):
+        return {
+            'displayName': self.displayName,
+            'desc': self.desc,
+        }
+
+
+@attr.s
 class Table(Panel):
     """Generates Table panel json structure
 
@@ -3219,6 +3294,8 @@ class Table(Panel):
     :param mappings: To assign colors to boolean or string values, use Value mappings
     :param overrides: To override the base characteristics of certain data
     :param showHeader: Show the table header
+    :param unit: units
+    :param sortBy: Sort rows by table fields
     """
 
     align = attr.ib(default='auto', validator=instance_of(str))
@@ -3230,7 +3307,12 @@ class Table(Panel):
     mappings = attr.ib(default=attr.Factory(list))
     overrides = attr.ib(default=attr.Factory(list))
     showHeader = attr.ib(default=True, validator=instance_of(bool))
-    span = attr.ib(default=6)
+    span = attr.ib(default=6),
+    unit = attr.ib(default='', validator=instance_of(str))
+    sortBy = attr.ib(default=attr.Factory(list), validator=attr.validators.deep_iterable(
+        member_validator=instance_of(TableSortByField),
+        iterable_validator=instance_of(list)
+    ))
 
     @classmethod
     def with_styled_columns(cls, columns, styles=None, **kwargs):
@@ -3252,8 +3334,9 @@ class Table(Panel):
                         'custom': {
                             'align': self.align,
                             'displayMode': self.displayMode,
-                            'filterable': self.filterable
+                            'filterable': self.filterable,
                         },
+                        'unit': self.unit
                     },
                     'overrides': self.overrides
                 },
@@ -3261,7 +3344,8 @@ class Table(Panel):
                 'mappings': self.mappings,
                 'minSpan': self.minSpan,
                 'options': {
-                    'showHeader': self.showHeader
+                    'showHeader': self.showHeader,
+                    'sortBy': self.sortBy
                 },
                 'type': TABLE_TYPE,
             }

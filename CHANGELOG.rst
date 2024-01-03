@@ -18,7 +18,12 @@ Changelog
 0.x.x (?)
 ==================
 
+* Extended DashboardLink to support links to dashboards and urls, as per the docs_
+
+.. _`docs`: https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/manage-dashboard-links/#dashboard-links
+
 * Added ...
+* Add Unit option for Graph panel
 * Added Minimum option for Timeseries
 * Added Maximum option for Timeseries
 * Added Number of decimals displays option for Timeseries
@@ -26,9 +31,17 @@ Changelog
 * Extended SqlTarget to support parsing queries from files
 * Fix AlertCondition backwards compatibility (``useNewAlerts`` default to ``False``)
 * Added RateMetricAgg_ for ElasticSearch
+* added axisSoftMin and axisSoftMax options for TimeSeries
+* Added support for Azure Data Explorer datasource plugin (https://github.com/grafana/azure-data-explorer-datasource)
+* Added ``sortBy`` parameter to Table panel
+* Added ``tooltipSort`` parameter to TimeSeries panel
 
 .. _`Bar_Chart`: https://grafana.com/docs/grafana/latest/panels-visualizations/visualizations/bar-chart/
 .. _`RateMetricAgg`: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-metrics-rate-aggregation.html
+
+* Added unit parameter to the Table class in core
+* Added a hide parameter to ElasticsearchTarget
+* Fix value literal GAUGE_CALC_TOTAL to sum instead of total
 
 0.7.0 (2022-10-02)
 ==================
