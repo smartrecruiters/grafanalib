@@ -2,6 +2,11 @@
 Changelog
 =========
 
+0.7.1.post1 (2024-01-12)
+==================
+
+* Sync with upstream 0.7.1 release
+
 
 0.7.0.post2 (2023-10-31)
 ==================
@@ -14,15 +19,19 @@ Changelog
 * Adjust Grafana 9.xAlert Rules data model
 
 
+x.x.x ?
+==================
 
-0.x.x (?)
+* Added ...
+
+0.7.1 2024-01-12
 ==================
 
 * Extended DashboardLink to support links to dashboards and urls, as per the docs_
 
 .. _`docs`: https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/manage-dashboard-links/#dashboard-links
 
-* Added ...
+* Fix default options for Heatmap
 * Add Unit option for Graph panel
 * Added Minimum option for Timeseries
 * Added Maximum option for Timeseries
@@ -35,13 +44,14 @@ Changelog
 * Added support for Azure Data Explorer datasource plugin (https://github.com/grafana/azure-data-explorer-datasource)
 * Added ``sortBy`` parameter to Table panel
 * Added ``tooltipSort`` parameter to TimeSeries panel
+* Added unit parameter to the Table class in core
+* Added a hide parameter to ElasticsearchTarget
+* Fix value literal GAUGE_CALC_TOTAL to sum instead of total
+* Fix `BarGauge` orientation validation to accept `'auto'`
 
 .. _`Bar_Chart`: https://grafana.com/docs/grafana/latest/panels-visualizations/visualizations/bar-chart/
 .. _`RateMetricAgg`: https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-metrics-rate-aggregation.html
 
-* Added unit parameter to the Table class in core
-* Added a hide parameter to ElasticsearchTarget
-* Fix value literal GAUGE_CALC_TOTAL to sum instead of total
 
 0.7.0 (2022-10-02)
 ==================
